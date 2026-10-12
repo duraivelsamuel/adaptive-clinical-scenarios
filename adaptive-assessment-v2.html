@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Clinical Scenario Assessment</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#f0f4f8;--card:#ffffff;--primary:#1a5f8a;--primary-light:#2378b0;
+    --accent:#0d9e6e;--accent-light:#e8f7f2;--warn:#e87722;--warn-light:#fff4eb;
+    --danger:#c0392b;--danger-light:#fdf0ef;--text:#1a2530;--text-secondary:#4a6070;
+    --text-light:#7a94a8;--border:#d0dde8;--shadow:0 2px 12px rgba(26,95,138,0.10);
+    --radius:14px;--radius-sm:8px;--timer-green:#0d9e6e;--timer-amber:#e87722;--timer-red:#c0392b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:17px;line-height:1.5;overscroll-behavior:none}
+  #app{max-width:560px;margin:0 auto;padding:16px;min-height:100vh}
+  .screen{display:none}.screen.active{display:block}
+  .session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .logo-text{font-size:16px;font-weight:700;color:var(--primary);letter-spacing:-0.3px}
+  .header-actions{display:flex;align-items:center;gap:8px}
+  .session-badge{font-size:13px;color:var(--text-light);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 12px}
+  .pause-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-secondary);transition:opacity 0.15s}
+  .pause-btn:disabled{opacity:0.3}
+  .pause-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,37,48,0.75);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity 0.2s}
+  .pause-overlay.visible{opacity:1;pointer-events:all}
+  .pause-card{background:var(--card);border-radius:var(--radius);padding:32px 24px;text-align:center;max-width:300px;width:90%;transform:translateY(8px);transition:transform 0.2s}
+  .pause-overlay.visible .pause-card{transform:translateY(0)}
+  .pause-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px}
+  .pause-sub{font-size:15px;color:var(--text-secondary);margin-bottom:24px}
+  .pause-count{font-size:13px;color:var(--text-light);margin-top:12px}
+  .progress-area{margin-bottom:14px}
+  .progress-label{display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary);margin-bottom:6px}
+  .progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-light));border-radius:3px;transition:width 0.4s ease}
+  .timer-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .timer-ring-wrap{position:relative;width:52px;height:52px;flex-shrink:0}
+  .timer-ring-wrap svg{transform:rotate(-90deg)}
+  .timer-ring-bg{fill:none;stroke:var(--border);stroke-width:4}
+  .timer-ring-progress{fill:none;stroke:var(--timer-green);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 1s linear,stroke 0.5s}
+  .timer-number{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:700;color:var(--text)}
+  .timer-hint{font-size:13px;color:var(--text-light)}
+  .domain-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;padding:4px 10px;border-radius:20px;margin-bottom:12px}
+  .domain-badge.respiratory{background:#e8f0fb;color:#2c5faa}
+  .domain-badge.medication{background:#f3e8fb;color:#7c2ca8}
+  .domain-badge.deterioration{background:#fbe8e8;color:#a82c2c}
+  .domain-badge.infection{background:#e8fbf0;color:#1a7a44}
+  .domain-badge.fluid{background:#e8f4fb;color:#1a5f8a}
+  .domain-badge.neurological{background:#fdf4e8;color:#7a5a1a}
+  .scenario-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;border:1px solid var(--border)}
+  .patient-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-light);margin-bottom:10px}
+  .scenario-text{font-size:17px;line-height:1.6;color:var(--text)}
+  .vitals-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .vital-item{background:#f5f8fb;border-radius:var(--radius-sm);padding:10px 12px;border:1px solid var(--border)}
+  .vital-label{font-size:11px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px}
+  .vital-value{font-size:18px;font-weight:700;color:var(--text)}
+  .vital-value.abnormal{color:var(--danger)}.vital-value.borderline{color:var(--warn)}
+  .vital-missing{font-size:14px;color:var(--text-light);font-style:italic}
+  .question-label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:10px}
+  .answer-options{display:flex;flex-direction:column;gap:10px;margin-bottom:8px}
+  .answer-btn{display:flex;align-items:flex-start;gap:12px;background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;text-align:left;min-height:64px;transition:border-color 0.15s,background 0.15s,transform 0.1s;-webkit-user-select:none;user-select:none;width:100%}
+  .answer-btn:active{transform:scale(0.98);background:#f0f4f8;border-color:var(--primary)}
+  .answer-btn.selected{border-color:var(--primary);background:#edf3f9}
+  .answer-letter{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--bg);border:2px solid var(--border);font-size:15px;font-weight:700;color:var(--primary);flex-shrink:0;margin-top:1px}
+  .answer-btn.selected .answer-letter{background:var(--primary);border-color:var(--primary);color:#fff}
+  .answer-text{font-size:16px;line-height:1.5;color:var(--text);flex:1}
+  .confidence-card{background:var(--card);border-radius:var(--radius);padding:28px 20px;box-shadow:var(--shadow);text-align:center;border:1px solid var(--border)}
+  .confidence-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px}
+  .confidence-subtitle{font-size:15px;color:var(--text-secondary);margin-bottom:24px}
+  .confidence-btns{display:flex;gap:10px;justify-content:center;margin-bottom:16px}
+  .conf-btn{width:56px;height:56px;border-radius:50%;border:2px solid var(--border);background:var(--card);font-size:20px;font-weight:700;color:var(--text-secondary);cursor:pointer;transition:border-color 0.15s,background 0.15s,transform 0.1s;-webkit-user-select:none;user-select:none}
+  .conf-btn:active{transform:scale(0.92)}
+  .conf-btn.c1{border-color:#c0392b}.conf-btn.c2{border-color:#e87722}.conf-btn.c3{border-color:#f0c030}.conf-btn.c4{border-color:#27ae60}.conf-btn.c5{border-color:#1a5f8a}
+  .conf-btn.selected.c1{background:#c0392b;color:#fff;border-color:#c0392b}
+  .conf-btn.selected.c2{background:#e87722;color:#fff;border-color:#e87722}
+  .conf-btn.selected.c3{background:#f0c030;color:#fff;border-color:#f0c030}
+  .conf-btn.selected.c4{background:#27ae60;color:#fff;border-color:#27ae60}
+  .conf-btn.selected.c5{background:#1a5f8a;color:#fff;border-color:#1a5f8a}
+  .conf-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--text-light);padding:0 4px;margin-bottom:8px}
+  .conf-personalise{font-size:13px;color:var(--text-light);font-style:italic}
+  .feedback-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:12px}
+  .feedback-result{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .result-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .result-icon.correct{background:var(--accent-light)}.result-icon.incorrect{background:var(--danger-light)}
+  .result-title{font-size:18px;font-weight:700}
+  .result-title.correct{color:var(--accent)}.result-title.incorrect{color:var(--danger)}
+  .feedback-text{font-size:16px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px}
+  .pearl-card{background:#fffbea;border:1px solid #f0d060;border-radius:var(--radius-sm);padding:12px 14px}
+  .pearl-header{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#7a5a1a;margin-bottom:6px}
+  .pearl-text{font-size:15px;color:var(--text-secondary);line-height:1.5}
+  .transition-msg{background:linear-gradient(135deg,#edf3f9,#f0f4f8);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;font-size:15px;color:var(--primary);font-weight:500;text-align:center;margin-bottom:12px;display:none}
+  .transition-msg.visible{display:block}
+  .btn-primary{display:block;width:100%;padding:18px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:var(--radius);font-size:17px;font-weight:700;cursor:pointer;text-align:center;min-height:56px;-webkit-user-select:none;user-select:none;transition:opacity 0.15s,transform 0.1s}
+  .btn-primary:active{transform:scale(0.98);opacity:0.92}
+  .btn-secondary{display:block;width:100%;padding:16px;background:var(--card);color:var(--primary);border:2px solid var(--primary);border-radius:var(--radius);font-size:16px;font-weight:600;cursor:pointer;text-align:center;min-height:56px;-webkit-user-select:none;user-select:none;transition:opacity 0.15s,transform 0.1s;margin-top:10px}
+  .btn-secondary:active{transform:scale(0.98);opacity:0.92}
+  .start-card{background:var(--card);border-radius:var(--radius);padding:28px 20px;box-shadow:var(--shadow);text-align:center;border:1px solid var(--border)}
+  .start-icon{width:72px;height:72px;background:linear-gradient(135deg,var(--primary),var(--primary-light));border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 20px}
+  .start-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:8px}
+  .start-sub{font-size:16px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px}
+  .start-info-row{display:flex;justify-content:center;gap:20px;margin-bottom:28px}
+  .start-info-item{text-align:center}
+  .start-info-number{font-size:24px;font-weight:800;color:var(--primary)}
+  .start-info-label{font-size:12px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px}
+  .start-note{font-size:13px;color:var(--text-light);margin-top:14px}
+  .summary-header{text-align:center;padding:28px 0 20px}
+  .summary-icon{width:72px;height:72px;border-radius:50%;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 16px}
+  .summary-title{font-size:26px;font-weight:800;color:var(--text);margin-bottom:6px}
+  .summary-perf{font-size:17px;color:var(--text-secondary);margin-bottom:4px}
+  .summary-score-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--border);display:flex;align-items:center;gap:16px}
+  .score-big{font-size:48px;font-weight:800;color:var(--primary);line-height:1}
+  .score-denom{font-size:22px;color:var(--text-light)}
+  .score-info{flex:1}
+  .score-label{font-size:14px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+  .perf-badge{display:inline-block;font-size:15px;font-weight:700;padding:4px 14px;border-radius:20px}
+  .perf-badge.excellent{background:var(--accent-light);color:var(--accent)}
+  .perf-badge.good{background:#e8f0fb;color:var(--primary)}
+  .perf-badge.keep-practising{background:var(--warn-light);color:var(--warn)}
+  .trajectory-card{background:var(--card);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--border);display:flex;align-items:center;gap:14px}
+  .trajectory-badge{font-size:15px;font-weight:800;padding:6px 14px;border-radius:20px;white-space:nowrap}
+  .trajectory-badge.improving{background:var(--accent-light);color:var(--accent)}
+  .trajectory-badge.stable{background:#e8f0fb;color:var(--primary)}
+  .trajectory-badge.declining{background:var(--warn-light);color:var(--warn)}
+  .trajectory-desc{font-size:14px;color:var(--text-secondary);line-height:1.5}
+  .chart-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--border)}
+  .chart-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px}
+  #bsiChart{width:100% !important;max-height:220px}
+  .domain-summary-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--border)}
+  .domain-summary-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px}
+  .domain-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .domain-item{padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:#f8fafc}
+  .domain-item.weakest{border-color:var(--warn);background:var(--warn-light)}
+  .domain-item-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;text-transform:capitalize}
+  .domain-bar-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:4px}
+  .domain-bar-fill{height:100%;border-radius:3px;transition:width 0.6s ease}
+  .domain-bar-fill.strong{background:var(--accent)}
+  .domain-bar-fill.developing{background:var(--primary)}
+  .domain-bar-fill.focus{background:var(--warn)}
+  .domain-rating{font-size:12px;font-weight:600}
+  .domain-rating.strong{color:var(--accent)}.domain-rating.developing{color:var(--primary)}.domain-rating.focus{color:var(--warn)}
+  .spacer{height:16px}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .fade-in{animation:fadeIn 0.25s ease forwards}
+  /* ── Footer ─────────────────────────────────────────────── */
+  .app-footer{margin-top:32px;padding:24px 16px 20px;border-top:1px solid var(--border);text-align:center}
+  .footer-dev{font-size:13px;font-weight:600;color:var(--text-secondary);letter-spacing:0.2px;margin-bottom:16px}
+  .footer-dev span{color:var(--primary)}
+  .footer-references{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;text-align:left}
+  .footer-ref-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--text-light);margin-bottom:12px}
+  .footer-ref-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .footer-ref-list li{font-size:12px;line-height:1.55;color:var(--text-secondary)}
+  .footer-ref-list li a{color:var(--primary);text-decoration:none;word-break:break-all}
+  .footer-ref-list li a:hover{text-decoration:underline}
+  .footer-copy{font-size:11px;color:var(--text-light);margin-top:14px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="screen-start" class="screen active">
+    <div class="spacer"></div>
+    <div class="start-card fade-in">
+      <div class="start-icon">&#x1F4BB;</div>
+      <div class="start-title">Clinical Scenario Assessment</div>
+      <div class="start-sub">Work through 15 adaptive clinical scenarios across six nursing practice domains. Select the best priority action for each patient situation.</div>
+      <div class="start-info-row">
+        <div class="start-info-item"><div class="start-info-number">13</div><div class="start-info-label">Scenarios</div></div>
+        <div class="start-info-item"><div class="start-info-number">6</div><div class="start-info-label">Domains</div></div>
+        <div class="start-info-item"><div class="start-info-number">~20</div><div class="start-info-label">Minutes</div></div>
+      </div>
+      <button class="btn-primary" id="startBtn">Begin Assessment</button>
+      <div class="start-note">Your responses are recorded for learning analytics</div>
+    </div>
+  </div>
+
+  <div id="screen-scenario" class="screen">
+    <div class="session-header">
+      <div class="logo-text">EziNurse</div>
+      <div class="header-actions">
+        <div class="session-badge" id="sessionBadge">Q1 of 13</div>
+        <button class="pause-btn" id="pauseBtn" title="Pause">&#9646;&#9646;</button>
+      </div>
+    </div>
+    <div class="progress-area">
+      <div class="progress-label"><span id="progressLabel">Question 1</span><span id="progressPercent">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <div class="timer-row">
+      <div class="timer-ring-wrap">
+        <svg width="52" height="52" viewBox="0 0 52 52">
+          <circle class="timer-ring-bg" cx="26" cy="26" r="22"/>
+          <circle class="timer-ring-progress" id="timerRing" cx="26" cy="26" r="22" stroke-dasharray="138.23" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-number" id="timerDisplay">60</div>
+      </div>
+      <div class="timer-hint" id="timerHint">Take your time</div>
+    </div>
+    <div class="domain-badge respiratory" id="domainBadge">Respiratory</div>
+    <div class="scenario-card fade-in" id="scenarioCard">
+      <div class="patient-label">Patient Situation</div>
+      <div class="scenario-text" id="scenarioText"></div>
+      <div class="vitals-grid" id="vitalsGrid"></div>
+    </div>
+    <div class="question-label">What is your priority action?</div>
+    <div class="answer-options" id="answerOptions"></div>
+  </div>
+
+  <div id="screen-confidence" class="screen">
+    <div class="session-header">
+      <div class="logo-text">EziNurse</div>
+      <div class="session-badge" id="confBadge">Q1 of 13</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="confidence-card fade-in">
+      <div class="confidence-title">How confident were you in that decision?</div>
+      <div class="confidence-subtitle">Reflecting on your thinking helps build clinical judgement.</div>
+      <div class="confidence-btns">
+        <button class="conf-btn c1" data-val="1">1</button>
+        <button class="conf-btn c2" data-val="2">2</button>
+        <button class="conf-btn c3" data-val="3">3</button>
+        <button class="conf-btn c4" data-val="4">4</button>
+        <button class="conf-btn c5" data-val="5">5</button>
+      </div>
+      <div class="conf-labels"><span>Not confident</span><span>Very confident</span></div>
+      <div class="conf-personalise">Your honest rating helps personalise your learning experience.</div>
+    </div>
+  </div>
+
+  <div id="screen-feedback" class="screen">
+    <div class="session-header">
+      <div class="logo-text">EziNurse</div>
+      <div class="session-badge" id="feedbackBadge">Q1 of 13</div>
+    </div>
+    <div class="transition-msg" id="transitionMsg"></div>
+    <div class="feedback-card fade-in">
+      <div class="feedback-result" id="feedbackResult"></div>
+      <div class="feedback-text" id="feedbackText"></div>
+      <div class="pearl-card">
+        <div class="pearl-header">&#x1F4A1; Clinical Pearl</div>
+        <div class="pearl-text" id="pearlText"></div>
+      </div>
+    </div>
+    <button class="btn-primary" id="nextBtn">Continue</button>
+  </div>
+
+  <div id="screen-summary" class="screen">
+    <div class="summary-header fade-in">
+      <div class="summary-icon" id="summaryIcon">&#x1F393;</div>
+      <div class="summary-title">Session Complete</div>
+      <div class="summary-perf" id="summaryPerf"></div>
+    </div>
+    <div class="summary-score-card fade-in">
+      <div><span class="score-big" id="scoreBig">0</span><span class="score-denom" id="scoreDenom">/13</span></div>
+      <div class="score-info">
+        <div class="score-label">Optimal Responses</div>
+        <div class="perf-badge" id="perfBadge">--</div>
+      </div>
+    </div>
+    <div class="trajectory-card fade-in">
+      <div class="trajectory-badge improving" id="trajectoryBadge">Improving</div>
+      <div class="trajectory-desc" id="trajectoryDesc">Your clinical confidence improved across the session.</div>
+    </div>
+    <div class="chart-card fade-in">
+      <div class="chart-title">Your Response Pattern</div>
+      <canvas id="bsiChart"></canvas>
+    </div>
+    <div class="domain-summary-card fade-in">
+      <div class="domain-summary-title">Performance by Domain</div>
+      <div class="domain-grid" id="domainGrid"></div>
+    </div>
+    <button class="btn-primary" id="submitSummaryBtn">Submit &amp; Finish</button>
+    <button class="btn-secondary" id="retryBtn">Try Again</button>
+  </div>
+</div>
+
+<footer class="app-footer">
+  <div class="footer-dev">Developed by <span>Dr. Samuel Duraivel</span></div>
+  <div class="footer-references">
+    <div class="footer-ref-title">References</div>
+    <ul class="footer-ref-list">
+      <li>Duraivel, S. (2026). <em>Proof-of-concept implementation of the cGAN conditioning mechanism for adaptive VRET</em>. Zenodo. <a href="https://doi.org/10.5281/zenodo.21326066" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.21326066</a></li>
+      <li>Duraivel, S. (2024). Enhancing virtual reality exposure therapy for social anxiety disorder using generative adversarial networks: A personalized and adaptive approach. <em>Preprints.org.</em> <a href="https://doi.org/10.20944/preprints202409.0107.v1" target="_blank" rel="noopener">https://doi.org/10.20944/preprints202409.0107.v1</a></li>
+      <li>Vasudevan, S., Piazza, A., Rajendran, L., &amp; Duraivel, S. (2026). Mapping the metaverse minefield: A TIPS framework for security-conscious business adoption. <em>Computers &amp; Security, 160</em>, 104710. <a href="https://doi.org/10.1016/j.cose.2025.104710" target="_blank" rel="noopener">https://doi.org/10.1016/j.cose.2025.104710</a></li>
+      <li>Duraivel, S., Rajendran, L., Vasudevan, S., &amp; Piazza, A. (2026). Public sentiment and thematic evolution in the metaverse: A large-scale computational analysis of Twitter discourse. <em>PLOS ONE, 21</em>(5), e0345135. <a href="https://doi.org/10.1371/journal.pone.0345135" target="_blank" rel="noopener">https://doi.org/10.1371/journal.pone.0345135</a></li>
+      <li>Creed, C., Al-Kalbani, M., Theil, A., Sarcar, S., &amp; Williams, I. (2024). Inclusive AR/VR: Accessibility barriers for immersive technologies. <em>Universal Access in the Information Society, 23</em>(1), 59–73.</li>
+      <li>Morina, N., Ijntema, H., Meyerbröker, K., &amp; Emmelkamp, P. M. G. (2023). Can virtual reality exposure therapy gains be generalised to real-life? A meta-analysis of studies applying behavioural assessments. <em>Behaviour Research and Therapy, 74</em>, 18–24.</li>
+      <li>Tanner, C. A. (2006). Thinking like a nurse: A research-based model of clinical judgment in nursing. <em>Journal of Nursing Education, 45</em>(6), 204–211. <a href="https://doi.org/10.3928/01484834-20060601-04" target="_blank" rel="noopener">https://doi.org/10.3928/01484834-20060601-04</a></li>
+      <li>National Institute for Health and Care Excellence (NICE). (2022). <em>Asthma: Diagnosis, monitoring and chronic asthma management</em> (NG80). NICE. <a href="https://www.nice.org.uk/guidance/ng80" target="_blank" rel="noopener">https://www.nice.org.uk/guidance/ng80</a></li>
+      <li>Global Initiative for Chronic Obstructive Lung Disease (GOLD). (2024). <em>Global strategy for prevention, diagnosis and management of COPD: 2024 report</em>. GOLD. <a href="https://goldcopd.org" target="_blank" rel="noopener">https://goldcopd.org</a></li>
+      <li>Nursing and Midwifery Board of Australia (NMBA). (2016). <em>Registered nurse standards for practice</em>. NMBA. <a href="https://www.nursingmidwiferyboard.gov.au" target="_blank" rel="noopener">https://www.nursingmidwiferyboard.gov.au</a></li>
+    </ul>
+    <div class="footer-copy">&copy; 2026 Dr. Samuel Duraivel. For educational use only.</div>
+  </div>
+</footer>
+
+<div class="pause-overlay" id="pauseOverlay">
+  <div class="pause-card">
+    <div class="pause-title">Paused</div>
+    <div class="pause-sub">Your progress is saved. Resume when you are ready.</div>
+    <button class="btn-primary" id="resumeBtn">Resume</button>
+    <div class="pause-count" id="pauseCount"></div>
+  </div>
+</div>
+
+<script>
+
+var CFG={SL:13,BH:0.65,BL:0.35,CC:2,RW:7,MP:3,WL:0.4,WA:0.4,WC:0.2};
+
+// Each scenario: id, domain, versions (Simple/Moderate/Complex)
+// Each version: text, vitals array, opts array, ci (correct index), fb (feedback), pearl
+var SC = [
+  {id:"RESP_001",domain:"respiratory",versions:{
+    Simple:{
+      text:"Mr. Thompson, 58 years old, reports shortness of breath after walking one flight of stairs. He has mild asthma.",
+      vitals:[{l:"SpO2",v:"94%",s:"borderline"},{l:"RR",v:"20 bpm",s:"normal"},{l:"HR",v:"88 bpm",s:"normal"},{l:"BP",v:"128/78 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Reassure the patient and document the observation.",lv:"Safe"},
+        {lt:"B",tx:"Administer prescribed salbutamol inhaler and reassess SpO2 in 15 minutes.",lv:"Moderate"},
+        {lt:"C",tx:"Apply 2L/min oxygen and notify the physician immediately.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. For mild exertional dyspnoea with mildly reduced SpO2 in a known asthmatic, reassurance and close monitoring is the appropriate first step.",
+      pearl:"SpO2 94% in a known asthmatic with mild exertional symptoms does not automatically require supplemental oxygen - reassess trend and symptoms together."
+    },
+    Moderate:{
+      text:"Mr. Thompson, 58 years old, has increasing breathlessness at rest. He has used his salbutamol inhaler twice in the last hour without relief.",
+      vitals:[{l:"SpO2",v:"91%",s:"abnormal"},{l:"RR",v:"26 bpm",s:"abnormal"},{l:"HR",v:"102 bpm",s:"borderline"},{l:"BP",v:"130/82 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Reassure and continue to monitor.",lv:"Safe"},
+        {lt:"B",tx:"Apply 4-6L/min oxygen via Hudson mask, notify physician, prepare bronchodilator nebulisation.",lv:"Moderate"},
+        {lt:"C",tx:"Initiate emergency response and apply high-flow oxygen.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Moderate acute asthma exacerbation with deteriorating SpO2 and raised RR requires oxygen, physician notification, and bronchodilator nebulisation.",
+      pearl:"In acute asthma, salbutamol via nebuliser delivers drug more reliably than MDI during moderate-to-severe exacerbations due to poor inspiratory effort."
+    },
+    Complex:{
+      text:"Mr. Thompson, 58 years old, is acutely dyspnoeic at rest, using accessory muscles, and unable to complete sentences. He has used salbutamol six times in two hours.",
+      vitals:[{l:"SpO2",v:"87%",s:"abnormal"},{l:"RR",v:"32 bpm",s:"abnormal"},{l:"HR",v:"118 bpm",s:"abnormal"},{l:"BP",v:"145/92 mmHg",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Provide another salbutamol inhaler and reassess in 20 minutes.",lv:"Safe"},
+        {lt:"B",tx:"Apply 4L/min oxygen and notify the ward physician when available.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response, apply high-flow oxygen via non-rebreather mask, establish IV access, prepare IV hydrocortisone and continuous nebulised salbutamol.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Severe asthma exacerbation requires rapid response, high-flow oxygen, IV access, and corticosteroids - all are time-critical.",
+      pearl:"Life-threatening asthma features include silent chest, cyanosis, exhaustion, bradycardia, and confusion - any one mandates immediate escalation."
+    }
+  }},
+  {id:"RESP_002",domain:"respiratory",versions:{
+    Simple:{
+      text:"Mrs. Nguyen, 72 years old, has a mild productive cough and feels slightly more breathless than usual. She has COPD.",
+      vitals:[{l:"SpO2",v:"93%",s:"borderline"},{l:"RR",v:"18 bpm",s:"normal"},{l:"HR",v:"80 bpm",s:"normal"},{l:"BP",v:"136/80 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Encourage fluid intake, position upright, document and monitor.",lv:"Safe"},
+        {lt:"B",tx:"Collect sputum specimen, notify doctor, and monitor vital signs 4-hourly.",lv:"Moderate"},
+        {lt:"C",tx:"Start broad-spectrum antibiotics per standing orders.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Good. With only mild symptoms and stable vitals, supportive care, positioning, and close monitoring are appropriate.",
+      pearl:"In COPD, SpO2 targets are 88-92% rather than 95% or above to avoid suppressing hypoxic respiratory drive."
+    },
+    Moderate:{
+      text:"Mrs. Nguyen, 72 years old, has worsening dyspnoea over 24 hours with green sputum. Her COPD is usually well-controlled.",
+      vitals:[{l:"SpO2",v:"89%",s:"abnormal"},{l:"RR",v:"24 bpm",s:"abnormal"},{l:"HR",v:"96 bpm",s:"borderline"},{l:"BP",v:"138/84 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Encourage coughing and deep breathing exercises only.",lv:"Safe"},
+        {lt:"B",tx:"Apply controlled 24% oxygen via Venturi mask, collect sputum specimen, notify physician.",lv:"Moderate"},
+        {lt:"C",tx:"Apply high-flow oxygen and commence IV antibiotics without awaiting physician review.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. In COPD, controlled oxygen via Venturi mask is critical. 24% Venturi, sputum culture, and physician notification are all correct.",
+      pearl:"Venturi masks provide precise FiO2 and are the gold standard for COPD patients who require controlled oxygen."
+    },
+    Complex:{
+      text:"Mrs. Nguyen, 72 years old, is markedly dyspnoeic, diaphoretic, and increasingly confused. Her sputum is green and blood-streaked. She has COPD and type 2 diabetes.",
+      vitals:[{l:"SpO2",v:"84%",s:"abnormal"},{l:"RR",v:"34 bpm",s:"abnormal"},{l:"HR",v:"122 bpm",s:"abnormal"},{l:"BP",v:"100/62 mmHg",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Position upright, apply 2L nasal prongs, call for routine physician review.",lv:"Safe"},
+        {lt:"B",tx:"Apply 24% Venturi mask oxygen and notify the ward team.",lv:"Moderate"},
+        {lt:"C",tx:"Call rapid response, apply controlled oxygen titrated by SpO2, establish IV access, collect blood cultures and ABG, prepare for non-invasive ventilation.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Confusion, haemoptysis, hypotension, and severe hypoxaemia require urgent escalation. Controlled oxygen, IV access, cultures, ABG, and RRT activation are all simultaneously indicated.",
+      pearl:"NIV/BiPAP is first-line therapy for hypercapnic respiratory failure in COPD - early initiation reduces mortality and intubation rates."
+    }
+  }},
+  {id:"RESP_003",domain:"respiratory",versions:{
+    Simple:{
+      text:"Mr. Patel, 44 years old, underwent elective knee surgery this morning. He now reports mild chest tightness.",
+      vitals:[{l:"SpO2",v:"95%",s:"normal"},{l:"RR",v:"16 bpm",s:"normal"},{l:"HR",v:"84 bpm",s:"normal"},{l:"BP",v:"120/76 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Reassure the patient, encourage deep breathing, and document.",lv:"Safe"},
+        {lt:"B",tx:"Perform full respiratory assessment and notify the surgical team.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response and prepare for emergency chest imaging.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. With stable vitals and mild post-operative chest discomfort, reassurance, deep breathing, and close monitoring are appropriate first steps.",
+      pearl:"Post-operative chest pain always requires documentation and baseline assessment before escalating."
+    },
+    Moderate:{
+      text:"Mr. Patel, 44 years old, is 6 hours post knee replacement. He reports pleuritic chest pain and one episode of haemoptysis. He had a DVT five years ago.",
+      vitals:[{l:"SpO2",v:"92%",s:"borderline"},{l:"RR",v:"22 bpm",s:"abnormal"},{l:"HR",v:"108 bpm",s:"borderline"},{l:"BP",v:"118/72 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Apply ice pack to the knee and continue analgesia only.",lv:"Safe"},
+        {lt:"B",tx:"Apply supplemental oxygen, notify surgical team urgently, document - pulmonary embolism must be excluded.",lv:"Moderate"},
+        {lt:"C",tx:"Administer heparin immediately and arrange CT pulmonary angiogram without physician order.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Pleuritic chest pain, haemoptysis, and DVT history in a post-operative patient raises strong concern for pulmonary embolism. Oxygen, urgent escalation, and documentation are correct.",
+      pearl:"Pulmonary embolism classically presents with pleuritic chest pain, haemoptysis, and dyspnoea - DVT history and recent surgery are major risk factors."
+    },
+    Complex:{
+      text:"Mr. Patel, 44 years old, is 6 hours post knee replacement. He has acute-onset severe chest pain, profound dyspnoea, and is peripherally cyanosed. He has DVT history and factor V Leiden mutation.",
+      vitals:[{l:"SpO2",v:"82%",s:"abnormal"},{l:"RR",v:"38 bpm",s:"abnormal"},{l:"HR",v:"136 bpm",s:"abnormal"},{l:"BP",v:"88/54 mmHg",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Apply 2L nasal prongs and call the ward nurse-in-charge.",lv:"Safe"},
+        {lt:"B",tx:"Apply oxygen, elevate legs, and notify the surgical registrar.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response, apply high-flow oxygen via non-rebreather mask, establish large-bore IV access, draw urgent bloods including D-dimer and troponin, obtain 12-lead ECG, prepare for potential thrombolysis.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. This is massive pulmonary embolism with haemodynamic compromise - SpO2 82%, HR 136, BP 88/54. Immediate RRT, high-flow oxygen, IV access, and urgent investigations are required.",
+      pearl:"Massive PE with haemodynamic instability carries greater than 30% 30-day mortality - systemic thrombolysis or surgical embolectomy may be life-saving."
+    }
+  }},
+  {id:"MED_001",domain:"medication",versions:{
+    Simple:{
+      text:"Mrs. Hassan, 55 years old, is prescribed metformin 500mg oral twice daily. She asks why she needs to take it with food.",
+      vitals:[{l:"BSL",v:"8.2 mmol/L",s:"borderline"},{l:"HR",v:"74 bpm",s:"normal"},{l:"BP",v:"126/78 mmHg",s:"normal"},{l:"Wt",v:"78 kg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Administer metformin with a full glass of water, explain it reduces GI side effects when taken with food.",lv:"Safe"},
+        {lt:"B",tx:"Withhold metformin until the BSL drops below 7 mmol/L.",lv:"Moderate"},
+        {lt:"C",tx:"Contact physician to increase the dose before administering.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. Metformin is administered with food to reduce GI side effects. Explaining this supports medication adherence and health literacy.",
+      pearl:"Metformin must be withheld before IV contrast administration and for 48 hours after, due to the risk of contrast-induced nephropathy and lactic acidosis."
+    },
+    Moderate:{
+      text:"Mrs. Hassan, 55 years old, is prescribed IV contrast for a CT scan today. She takes metformin 1000mg twice daily and has a creatinine of 98 micromol/L.",
+      vitals:[{l:"BSL",v:"7.8 mmol/L",s:"borderline"},{l:"Creatinine",v:"98 umol/L",s:"borderline"},{l:"HR",v:"80 bpm",s:"normal"},{l:"BP",v:"130/82 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Administer the morning metformin dose as prescribed before the CT scan.",lv:"Safe"},
+        {lt:"B",tx:"Hold metformin 48 hours before and after IV contrast, inform the physician, and document the rationale.",lv:"Moderate"},
+        {lt:"C",tx:"Cancel the CT scan as metformin and contrast are absolutely contraindicated.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Metformin must be withheld around IV contrast due to the risk of lactic acidosis. 48-hour hold before and after contrast is correct protocol.",
+      pearl:"Metformin-associated lactic acidosis carries up to 50% mortality - renal function assessment and metformin withholding protocol adherence are essential."
+    },
+    Complex:{
+      text:"Mrs. Hassan, 55 years old, is post-CT scan with contrast. She took her metformin this morning. Her creatinine has risen to 148 micromol/L today.",
+      vitals:[{l:"Creatinine",v:"148 umol/L",s:"abnormal"},{l:"BSL",v:"9.4 mmol/L",s:"borderline"},{l:"HR",v:"92 bpm",s:"borderline"},{l:"Urine Output",v:"20 mL/hr",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Reassure the patient and continue regular metformin doses.",lv:"Safe"},
+        {lt:"B",tx:"Hold all metformin doses, increase oral fluid intake, and recheck creatinine tomorrow.",lv:"Moderate"},
+        {lt:"C",tx:"Withhold metformin immediately, notify physician urgently of rising creatinine and contrast exposure, commence IV fluid hydration per AKI protocol, strict hourly fluid balance, arrange urgent nephrology review.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Rising creatinine post-contrast with metformin administration is a serious patient safety event. Immediate withholding, AKI protocol activation, and nephrology review are all required.",
+      pearl:"Contrast-induced AKI typically peaks at 2-5 days post-administration - early creatinine monitoring and IV hydration with 0.9% saline is critical."
+    }
+  }},
+  {id:"MED_002",domain:"medication",versions:{
+    Simple:{
+      text:"Mr. Ramos, 70 years old, is prescribed warfarin 5mg daily. His INR today is 1.8.",
+      vitals:[{l:"INR",v:"1.8",s:"borderline"},{l:"HR",v:"72 bpm",s:"normal"},{l:"BP",v:"128/76 mmHg",s:"normal"},{l:"Temp",v:"36.8 C",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Administer warfarin as prescribed, document the INR, and notify the physician.",lv:"Safe"},
+        {lt:"B",tx:"Hold the warfarin dose and administer vitamin K without a physician order.",lv:"Moderate"},
+        {lt:"C",tx:"Double the warfarin dose to bring the INR into therapeutic range faster.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. An INR of 1.8 is below therapeutic range but not critically low. Administer as prescribed, document, and notify the physician for review.",
+      pearl:"Warfarin has a narrow therapeutic index - always verify the current INR before administration and notify the prescriber of out-of-range values."
+    },
+    Moderate:{
+      text:"Mr. Ramos, 70 years old, on warfarin for AF, has gum bleeding and epistaxis this morning. He takes warfarin 7mg daily after a recent dose increase.",
+      vitals:[{l:"INR",v:"5.8",s:"abnormal"},{l:"HR",v:"78 bpm",s:"normal"},{l:"BP",v:"132/80 mmHg",s:"normal"},{l:"Temp",v:"37.0 C",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Administer today's warfarin dose as prescribed.",lv:"Safe"},
+        {lt:"B",tx:"Withhold warfarin, notify physician urgently, document INR and symptoms, obtain further bloods.",lv:"Moderate"},
+        {lt:"C",tx:"Administer IV vitamin K 10mg immediately without physician order.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. An INR of 5.8 with active bleeding requires immediate withholding of warfarin and urgent physician notification. Vitamin K decisions are made by the physician.",
+      pearl:"For INR greater than 5 with minor bleeding, withhold warfarin and consider low-dose oral vitamin K. For INR greater than 8 or significant bleeding, IV vitamin K and FFP may be required."
+    },
+    Complex:{
+      text:"Mr. Ramos, 70 years old, is found with frank haematuria, haematemesis, and marked confusion. His INR returns at 11.2. He has a mechanical heart valve.",
+      vitals:[{l:"INR",v:"11.2",s:"abnormal"},{l:"HR",v:"118 bpm",s:"abnormal"},{l:"BP",v:"88/52 mmHg",s:"abnormal"},{l:"GCS",v:"12/15",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Withhold warfarin and recheck INR in 6 hours.",lv:"Safe"},
+        {lt:"B",tx:"Hold warfarin, notify physician, and administer oral vitamin K.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response, withhold warfarin, establish IV access, administer IV vitamin K and prepare 4-factor PCC or FFP per haemorrhage protocol, crossmatch blood, urgent haematology and surgical review.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. INR 11.2 with life-threatening haemorrhage requires immediate reversal. IV vitamin K, PCC or FFP, Code activation, and urgent surgical review are all simultaneously indicated.",
+      pearl:"In patients with mechanical heart valves, over-reversal of anticoagulation risks valve thrombosis - haematology guidance on INR target during active reversal is essential."
+    }
+  }},
+  {id:"MED_003",domain:"medication",versions:{
+    Simple:{
+      text:"Mrs. Kim, 48 years old, is prescribed morphine 2.5mg IV PRN for post-operative pain. Her pain score is 4/10.",
+      vitals:[{l:"RR",v:"16 bpm",s:"normal"},{l:"SpO2",v:"97%",s:"normal"},{l:"HR",v:"76 bpm",s:"normal"},{l:"BP",v:"118/74 mmHg",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Assess pain comprehensively, administer morphine as prescribed, and reassess in 30 minutes.",lv:"Safe"},
+        {lt:"B",tx:"Withhold morphine as the pain score is below 5/10 and does not warrant opioids.",lv:"Moderate"},
+        {lt:"C",tx:"Administer double the prescribed dose for faster pain relief.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. A pain score of 4/10 is moderate and warrants analgesia per prescription. Comprehensive assessment, administration, and reassessment are all essential.",
+      pearl:"Pain is whatever the patient says it is - use a validated scale consistently and document both pre- and post-intervention scores."
+    },
+    Moderate:{
+      text:"Mrs. Kim, 48 years old, has received three doses of morphine 2.5mg IV over the past 4 hours. She is now very drowsy and difficult to rouse.",
+      vitals:[{l:"RR",v:"9 bpm",s:"abnormal"},{l:"SpO2",v:"90%",s:"abnormal"},{l:"HR",v:"58 bpm",s:"borderline"},{l:"GCS",v:"11/15",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Allow the patient to rest as she was in significant pain earlier.",lv:"Safe"},
+        {lt:"B",tx:"Cease further opioids, apply oxygen, perform AVPU assessment, notify physician urgently, prepare naloxone for physician order.",lv:"Moderate"},
+        {lt:"C",tx:"Administer naloxone 400mcg IV immediately without physician order.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. RR of 9 and decreasing consciousness after opioid administration indicates respiratory depression. Cease opioids, oxygen, assessment, and physician escalation are the correct steps.",
+      pearl:"Naloxone has a shorter half-life than most opioids - re-narcotisation can occur after 30-90 minutes. Ongoing monitoring and possible repeat dosing is required."
+    },
+    Complex:{
+      text:"Mrs. Kim, 48 years old, is unresponsive and cyanosed. Her opioid PCA has delivered 15mg morphine in the past 2 hours following a pump programming error.",
+      vitals:[{l:"RR",v:"4 bpm",s:"abnormal"},{l:"SpO2",v:"76%",s:"abnormal"},{l:"HR",v:"44 bpm",s:"abnormal"},{l:"GCS",v:"3/15",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Turn off the PCA pump and observe the patient.",lv:"Safe"},
+        {lt:"B",tx:"Stop PCA, apply oxygen, and call for physician review.",lv:"Moderate"},
+        {lt:"C",tx:"Call Code Blue immediately, cease PCA pump, apply BVM ventilation, administer naloxone per emergency protocol, establish IV access, prepare for ICU admission, complete medication error incident report.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. GCS 3, RR 4, SpO2 76% with opioid overdose from a pump error is a Code Blue. BVM ventilation, immediate naloxone, and ICU escalation are all time-critical. Document and report the error.",
+      pearl:"PCA pump programming errors are a significant patient safety issue - double-nurse checking of PCA setup is a mandatory safety standard."
+    }
+  }},
+  {id:"DET_001",domain:"deterioration",versions:{
+    Simple:{
+      text:"Mrs. Johansson, 83 years old, is admitted for a urinary tract infection. She has become slightly more confused than her baseline over the past few hours.",
+      vitals:[{l:"Temp",v:"38.2 C",s:"borderline"},{l:"HR",v:"90 bpm",s:"borderline"},{l:"BP",v:"130/78 mmHg",s:"normal"},{l:"SpO2",v:"95%",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Ensure a safe environment, reorient, notify physician, monitor vitals 2-hourly.",lv:"Safe"},
+        {lt:"B",tx:"Sedate the patient to prevent falls and review in the morning.",lv:"Moderate"},
+        {lt:"C",tx:"Administer IV antibiotics without awaiting physician order.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. Any change in cognition in an elderly patient - even mild - requires prompt communication to the clinical team.",
+      pearl:"New confusion in an elderly patient is a red flag - common causes include infection, hypoxia, hypoglycaemia, pain, urinary retention, and medication side effects."
+    },
+    Moderate:{
+      text:"Mrs. Johansson, 83 years old, has developed marked agitation, is pulling at IV lines, and does not recognise family members. Her UTI was confirmed this morning.",
+      vitals:[{l:"Temp",v:"39.1 C",s:"abnormal"},{l:"HR",v:"114 bpm",s:"abnormal"},{l:"BP",v:"108/66 mmHg",s:"borderline"},{l:"SpO2",v:null,s:"missing"}],
+      opts:[
+        {lt:"A",tx:"Apply soft restraints to keep the patient from dislodging lines.",lv:"Safe"},
+        {lt:"B",tx:"Apply oxygen, use least restrictive safety measures, notify physician urgently - likely urosepsis causing delirium.",lv:"Moderate"},
+        {lt:"C",tx:"Administer haloperidol for agitation without physician review.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Marked delirium with tachycardia, fever, and hypotension in a UTI patient indicates urosepsis. Physical restraints are the least appropriate response.",
+      pearl:"Physical restraints increase delirium severity and falls risk - use the least restrictive approach. Delirium in urosepsis requires treating the underlying infection."
+    },
+    Complex:{
+      text:"Mrs. Johansson, 83 years old, is unresponsive to voice, has cold mottled peripheries, and has been incontinent of dark brown urine. She was found on the floor 30 minutes ago.",
+      vitals:[{l:"Temp",v:"40.8 C",s:"abnormal"},{l:"HR",v:"132 bpm",s:"abnormal"},{l:"BP",v:"66/38 mmHg",s:"abnormal"},{l:"GCS",v:"5/15",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Assist the patient back to bed and apply a blanket.",lv:"Safe"},
+        {lt:"B",tx:"Call the physician and administer IV fluids.",lv:"Moderate"},
+        {lt:"C",tx:"Activate Code Blue, apply high-flow oxygen, establish two IV lines with 30ml/kg fluid bolus per sepsis protocol, collect blood cultures, insert urinary catheter, draw urgent lactate and sepsis bloods, notify ICU.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. GCS 5, BP 66/38, HR 132, temp 40.8 - this is septic shock with imminent risk of cardiac arrest. All interventions must occur simultaneously.",
+      pearl:"The Sepsis Six bundle - oxygen, blood cultures, IV antibiotics, IV fluids, urine output monitoring, and lactate - should be completed within 1 hour of sepsis recognition."
+    }
+  }},
+  {id:"DET_002",domain:"deterioration",versions:{
+    Simple:{
+      text:"Mr. Obinna, 54 years old, develops mild chest pain while walking to the bathroom. He is 2 days post hip replacement and has a history of hypertension.",
+      vitals:[{l:"HR",v:"86 bpm",s:"normal"},{l:"BP",v:"148/90 mmHg",s:"borderline"},{l:"SpO2",v:"96%",s:"normal"},{l:"Temp",v:"37.2 C",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Return the patient to bed, rest, obtain a 12-lead ECG, and notify the surgical team.",lv:"Safe"},
+        {lt:"B",tx:"Reassure the patient that post-operative chest pain is common and encourage ambulation.",lv:"Moderate"},
+        {lt:"C",tx:"Administer aspirin 300mg immediately and call the cardiology team.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. New chest pain in a post-operative patient must never be dismissed. Rest, 12-lead ECG, and surgical team notification are the appropriate first steps.",
+      pearl:"Post-operative chest pain differentials include PE, ACS, musculoskeletal, and pneumothorax - a 12-lead ECG and comprehensive assessment guides next steps."
+    },
+    Moderate:{
+      text:"Mr. Obinna, 54 years old, day 2 post hip replacement, reports central crushing chest pain radiating to his left arm, diaphoresis, and nausea.",
+      vitals:[{l:"HR",v:"106 bpm",s:"borderline"},{l:"BP",v:"96/60 mmHg",s:"abnormal"},{l:"SpO2",v:"94%",s:"borderline"},{l:"Temp",v:"37.0 C",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Administer paracetamol for pain and await physician review.",lv:"Safe"},
+        {lt:"B",tx:"Rest, apply oxygen, obtain 12-lead ECG immediately, notify medical team urgently, establish IV access, prepare aspirin and GTN for physician order.",lv:"Moderate"},
+        {lt:"C",tx:"Activate cath lab independently and transfer the patient to cardiology.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Crushing chest pain with diaphoresis and hypotension strongly suggests ACS. Oxygen, 12-lead ECG, IV access, and urgent medical team notification are all immediate nursing priorities.",
+      pearl:"The 12-lead ECG should be performed within 10 minutes of the onset of chest pain - time to reperfusion is the key determinant of myocardial salvage in STEMI."
+    },
+    Complex:{
+      text:"Mr. Obinna, 54 years old, day 2 post hip replacement, is unresponsive. The 12-lead ECG shows ST elevation greater than 2mm in leads II, III, and aVF.",
+      vitals:[{l:"HR",v:"42 bpm",s:"abnormal"},{l:"BP",v:"60/30 mmHg",s:"abnormal"},{l:"SpO2",v:"78%",s:"abnormal"},{l:"GCS",v:"6/15",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Place in recovery position and obtain a senior nurse.",lv:"Safe"},
+        {lt:"B",tx:"Apply high-flow oxygen and call the medical registrar.",lv:"Moderate"},
+        {lt:"C",tx:"Call Code Blue, commence CPR if no central pulse, apply defib pads, apply high-flow oxygen with BVM, establish IV access, administer aspirin and IV heparin per cardiac emergency protocol, prepare for emergency PCI transfer.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Unresponsive with HR 42, BP 60/30, SpO2 78%, and inferior STEMI - this is cardiogenic shock. Code Blue, CPR readiness, defib pads, BVM ventilation, and emergency PCI pathway activation are all simultaneous priorities.",
+      pearl:"Inferior STEMI frequently involves the right ventricle - avoid nitrates and diuretics which can cause profound hypotension. Fluid resuscitation is often required."
+    }
+  }},
+  {id:"DET_003",domain:"deterioration",versions:{
+    Simple:{
+      text:"Mrs. Andersen, 78 years old, has mild confusion and reports not feeling well for the past day. She has type 2 diabetes and hypertension.",
+      vitals:[{l:"BSL",v:"14.8 mmol/L",s:"abnormal"},{l:"HR",v:"84 bpm",s:"normal"},{l:"BP",v:"142/86 mmHg",s:"borderline"},{l:"Temp",v:"37.6 C",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Perform full assessment, notify physician of elevated BSL and confusion, review insulin and medication history.",lv:"Safe"},
+        {lt:"B",tx:"Reassure the family that confusion is common in elderly patients and increase oral fluids.",lv:"Moderate"},
+        {lt:"C",tx:"Administer corrective insulin dose without physician order.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. New confusion with a BSL of 14.8 mmol/L warrants thorough assessment and urgent physician notification.",
+      pearl:"Hyperglycaemia in hospitalised patients is associated with increased infection risk, impaired wound healing, and mortality - always investigate and notify."
+    },
+    Moderate:{
+      text:"Mrs. Andersen, 78 years old, has worsening confusion, polydipsia, polyuria, and generalised weakness over 48 hours. She is a type 2 diabetic on insulin.",
+      vitals:[{l:"BSL",v:"28.4 mmol/L",s:"abnormal"},{l:"HR",v:"108 bpm",s:"borderline"},{l:"BP",v:"100/64 mmHg",s:"borderline"},{l:"Urine Output",v:"30 mL/hr",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Increase oral fluid intake and recheck BSL in 2 hours.",lv:"Safe"},
+        {lt:"B",tx:"Notify physician urgently, establish IV access, obtain urgent bloods including renal function and ketones - this may be hyperosmolar hyperglycaemic state.",lv:"Moderate"},
+        {lt:"C",tx:"Administer 20 units of rapid-acting insulin IV bolus immediately.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. BSL 28.4 mmol/L with confusion and tachycardia in an elderly diabetic suggests HHS. Urgent physician notification, IV access, and blood investigations are critical.",
+      pearl:"HHS differs from DKA in that ketosis is absent or minimal - serum osmolality is markedly elevated. Rehydration is the cornerstone of treatment."
+    },
+    Complex:{
+      text:"Mrs. Andersen, 78 years old, is unresponsive, deeply dehydrated, and has not passed urine in 6 hours. Family reports she became increasingly drowsy over 3 days.",
+      vitals:[{l:"BSL",v:">33.3 mmol/L",s:"abnormal"},{l:"HR",v:"128 bpm",s:"abnormal"},{l:"BP",v:"80/50 mmHg",s:"abnormal"},{l:"Urine Output",v:"0 mL/hr",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Insert a urinary catheter and observe urine output.",lv:"Safe"},
+        {lt:"B",tx:"Notify physician and attempt oral rehydration.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response, insert two large-bore IV cannulas, commence 0.9% NaCl fluid resuscitation per hyperosmolar protocol, insert urinary catheter, obtain urgent bloods including osmolality and renal function, prepare for HDU admission.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. BSL above 33 mmol/L, anuric, BP 80/50, unresponsive - this is HHS with circulatory collapse. Rapid response, aggressive IV hydration, and urgent bloods are all time-critical.",
+      pearl:"Fluid replacement in HHS may require 8-10 litres over 24-48 hours - electrolyte monitoring is essential as potassium can shift dramatically."
+    }
+  }},
+  {id:"INF_001",domain:"infection",versions:{
+    Simple:{
+      text:"You are about to perform a wound dressing change for Mr. Singh, 62 years old, who has a clean surgical wound from an appendicectomy 2 days ago.",
+      vitals:[{l:"Temp",v:"37.1 C",s:"normal"},{l:"HR",v:"72 bpm",s:"normal"},{l:"BP",v:"126/78 mmHg",s:"normal"},{l:"WBC",v:"8.2 x10^9/L",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Perform hand hygiene, gather equipment, use aseptic non-touch technique throughout the dressing procedure.",lv:"Safe"},
+        {lt:"B",tx:"Use clean gloves and proceed with the dressing change immediately.",lv:"Moderate"},
+        {lt:"C",tx:"Ask the patient to perform his own dressing change with guidance.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. ANTT is mandatory for wound dressing changes. Hand hygiene, appropriate PPE, sterile field preparation, and non-touch technique throughout are all essential.",
+      pearl:"ANTT (Aseptic Non-Touch Technique) is the global standard for clinical procedures involving sterile sites - it protects both the patient from infection and the clinician from exposure."
+    },
+    Moderate:{
+      text:"Mr. Singh, 62 years old, is day 4 post appendicectomy. His wound has green purulent discharge, surrounding erythema, and is warm to touch.",
+      vitals:[{l:"Temp",v:"38.6 C",s:"abnormal"},{l:"HR",v:"98 bpm",s:"borderline"},{l:"BP",v:"128/80 mmHg",s:"normal"},{l:"WBC",v:"14.8 x10^9/L",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Apply a dry dressing to cover the wound and review tomorrow.",lv:"Safe"},
+        {lt:"B",tx:"Perform wound swab for M and C, notify surgical team, apply appropriate dressing, implement standard precautions.",lv:"Moderate"},
+        {lt:"C",tx:"Commence IV antibiotics and request immediate surgical wound debridement.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Signs of surgical site infection require wound swab collection before antibiotics, followed by surgical team notification and appropriate dressing management.",
+      pearl:"Wound swabs should be taken from the wound bed - not the surface exudate - to maximise recovery of causative organisms."
+    },
+    Complex:{
+      text:"Mr. Singh, 62 years old, is day 6 post appendicectomy. His wound has dehisced with exposed fascia, dark necrotic tissue, foul odour, and visible crepitus on palpation.",
+      vitals:[{l:"Temp",v:"39.8 C",s:"abnormal"},{l:"HR",v:"122 bpm",s:"abnormal"},{l:"BP",v:"92/58 mmHg",s:"abnormal"},{l:"WBC",v:"22.4 x10^9/L",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Apply a wet-to-dry dressing and flag for next ward round.",lv:"Safe"},
+        {lt:"B",tx:"Notify the surgical team, collect wound swab, and commence broad-spectrum antibiotics.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response immediately, notify surgical team for emergency theatre review, isolate patient, apply oxygen, establish IV access, commence broad-spectrum IV antibiotics urgently per necrotising fasciitis protocol, draw blood cultures and urgent bloods including lactate.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Crepitus, necrosis, dehiscence, foul odour, and haemodynamic instability indicate necrotising fasciitis - a surgical emergency. Immediate escalation, broad-spectrum antibiotics, and emergency theatre are all life-saving.",
+      pearl:"Necrotising fasciitis requires surgical debridement as definitive treatment - antibiotics alone are insufficient. Mortality can reach 30% even with prompt treatment."
+    }
+  }},
+  {id:"INF_002",domain:"infection",versions:{
+    Simple:{
+      text:"Mrs. Garcia, 55 years old, has been newly diagnosed with MRSA on a nasal swab. She is in a four-bed bay.",
+      vitals:[{l:"Temp",v:"36.9 C",s:"normal"},{l:"HR",v:"74 bpm",s:"normal"},{l:"BP",v:"122/76 mmHg",s:"normal"},{l:"SpO2",v:"98%",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Transfer patient to a single room, implement contact precautions, notify infection control, document in patient records.",lv:"Safe"},
+        {lt:"B",tx:"Continue care in the shared bay with standard precautions and gloves only.",lv:"Moderate"},
+        {lt:"C",tx:"Discharge the patient immediately to prevent ward transmission.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. MRSA requires immediate single room isolation with contact precautions - gown, gloves, dedicated equipment, and infection control notification are all mandatory.",
+      pearl:"MRSA decolonisation therapy - nasal mupirocin, chlorhexidine body wash, and oral rinse - is often prescribed alongside isolation. Adherence to the full course is important."
+    },
+    Moderate:{
+      text:"Mrs. Garcia, 55 years old, MRSA-positive, requires a peripheral IV insertion for IV antibiotics. You are about to perform the procedure.",
+      vitals:[{l:"Temp",v:"37.8 C",s:"borderline"},{l:"HR",v:"88 bpm",s:"normal"},{l:"BP",v:"126/78 mmHg",s:"normal"},{l:"WBC",v:"11.4 x10^9/L",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Don gloves only and proceed with IV insertion in the isolation room.",lv:"Safe"},
+        {lt:"B",tx:"Don gown and gloves before entering, perform ANTT for IV insertion, remove PPE and perform hand hygiene before leaving, document.",lv:"Moderate"},
+        {lt:"C",tx:"Ask a colleague to perform the procedure as you are not required to enter an MRSA room.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. MRSA contact precautions require gown and gloves for all patient contact. ANTT must be maintained for the IV insertion. PPE removal before leaving and hand hygiene are mandatory.",
+      pearl:"Correct PPE removal sequence: gloves first, then gown, then mask, then eye protection, followed by hand hygiene - this minimises self-contamination."
+    },
+    Complex:{
+      text:"Mrs. Garcia, 55 years old, MRSA-positive, has developed a new fever spike to 40.1 degrees and hypotension. She has an indwelling urinary catheter and a peripheral IV inserted 5 days ago.",
+      vitals:[{l:"Temp",v:"40.1 C",s:"abnormal"},{l:"HR",v:"118 bpm",s:"abnormal"},{l:"BP",v:"86/52 mmHg",s:"abnormal"},{l:"WBC",v:"26.8 x10^9/L",s:"abnormal"}],
+      opts:[
+        {lt:"A",tx:"Administer paracetamol for fever and increase oral fluids.",lv:"Safe"},
+        {lt:"B",tx:"Notify the physician, obtain blood cultures, and review the IV insertion site.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response, obtain blood cultures from peripheral site and IV line before antibiotics, remove the 5-day-old IV cannula and tip for culture, collect urine for M and C, commence broad-spectrum IV antibiotics per sepsis protocol including MRSA cover with vancomycin, isolate strictly, notify infection control and ICU.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. MRSA bacteraemia from a line or catheter source is a serious infection with mortality risk. Rapid response, cultures before antibiotics, line removal, vancomycin, and ICU notification are all indicated.",
+      pearl:"MRSA bacteraemia requires a minimum 14 days of IV vancomycin for uncomplicated bacteraemia - duration depends on echocardiography findings and source control."
+    }
+  }},
+  {id:"FLU_001",domain:"fluid",versions:{
+    Simple:{
+      text:"Mr. Lee, 68 years old, is day 1 post abdominal surgery. His fluid balance chart shows intake of 1800mL and output of 900mL over 12 hours.",
+      vitals:[{l:"HR",v:"78 bpm",s:"normal"},{l:"BP",v:"124/76 mmHg",s:"normal"},{l:"Urine Output",v:"75 mL/hr",s:"normal"},{l:"Temp",v:"37.0 C",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Document the fluid balance, review with the physician at the next ward round, continue prescribed IV fluids.",lv:"Safe"},
+        {lt:"B",tx:"Administer an additional 500mL IV fluid bolus independently to correct the balance.",lv:"Moderate"},
+        {lt:"C",tx:"Insert a urinary catheter immediately to obtain more accurate output measurements.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. A positive fluid balance of 900mL over 12 hours in an early post-operative patient is expected and does not require independent intervention.",
+      pearl:"Post-operative fluid balance targets vary by surgical procedure - indiscriminate IV fluid administration is associated with complications including pulmonary oedema and ileus."
+    },
+    Moderate:{
+      text:"Mr. Lee, 68 years old, is day 2 post abdominal surgery. His urine output has dropped to 20mL/hr over the past 3 hours. He has had 500mL oral intake and 1000mL IV fluid today.",
+      vitals:[{l:"HR",v:"102 bpm",s:"borderline"},{l:"BP",v:"104/66 mmHg",s:"borderline"},{l:"Urine Output",v:"20 mL/hr",s:"abnormal"},{l:"Creatinine",v:"126 umol/L",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Encourage more oral fluids and recheck output in 2 hours.",lv:"Safe"},
+        {lt:"B",tx:"Notify the surgical team urgently, assess for hypovolaemia, check fluid balance and recent medications, prepare for a possible IV fluid challenge per physician order.",lv:"Moderate"},
+        {lt:"C",tx:"Administer 1000mL IV fluid bolus immediately without physician order.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Oliguria post-operatively requires urgent escalation. Hypovolaemia, AKI, and urinary retention must all be considered. Physician review before IV fluid administration is essential.",
+      pearl:"Pre-renal AKI from hypovolaemia is the most common cause of post-operative oliguria - it is rapidly reversible with IV fluid resuscitation if identified early."
+    },
+    Complex:{
+      text:"Mr. Lee, 68 years old, is day 3 post abdominal surgery. He is in respiratory distress with bilateral crackles, a rising JVP, and pitting oedema to the knees. He has received 8L IV fluid over the past 24 hours.",
+      vitals:[{l:"SpO2",v:"88%",s:"abnormal"},{l:"RR",v:"28 bpm",s:"abnormal"},{l:"HR",v:"112 bpm",s:"abnormal"},{l:"BP",v:"148/92 mmHg",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Continue the prescribed IV fluid rate and monitor hourly.",lv:"Safe"},
+        {lt:"B",tx:"Slow the IV fluid rate, sit the patient upright, and notify the physician.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response, cease all IV fluids, sit fully upright, apply high-flow oxygen, notify surgical and medical teams urgently, prepare for IV frusemide per physician order, insert urinary catheter for strict hourly monitoring, request chest X-ray.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Bilateral crackles, raised JVP, oedema, SpO2 88%, and RR 28 after 8L IV fluid indicate acute pulmonary oedema from fluid overload. Rapid response, oxygen, cessation of fluids, and urgent diuresis are time-critical.",
+      pearl:"IV frusemide in fluid overload targets urine output of 1-2mL/kg/hr - monitor potassium closely as rapid diuresis causes hypokalaemia, which can precipitate arrhythmias."
+    }
+  }},
+  {id:"NEURO_001",domain:"neurological",versions:{
+    Simple:{
+      text:"Mrs. Davis, 66 years old, is admitted with a mild headache and right arm weakness that resolved completely 45 minutes ago. She has a history of hypertension.",
+      vitals:[{l:"HR",v:"80 bpm",s:"normal"},{l:"BP",v:"158/94 mmHg",s:"abnormal"},{l:"SpO2",v:"97%",s:"normal"},{l:"BSL",v:"6.8 mmol/L",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Perform a FAST assessment, obtain 12-lead ECG, notify physician urgently, keep nil by mouth pending medical review.",lv:"Safe"},
+        {lt:"B",tx:"Reassure the patient as symptoms have fully resolved and discharge planning can proceed.",lv:"Moderate"},
+        {lt:"C",tx:"Administer aspirin 300mg immediately and prepare the patient for thrombolysis.",lv:"Advanced"}
+      ],
+      ci:0,
+      fb:"Correct. Transient focal neurological symptoms are a TIA until proven otherwise - a medical emergency with high early stroke risk. FAST assessment, ECG, physician notification, and nil by mouth are all correct.",
+      pearl:"A TIA has a 10% risk of stroke within 2 days - ABCD2 risk stratification guides urgency. High-risk TIA patients require same-day specialist assessment and brain imaging."
+    },
+    Moderate:{
+      text:"Mrs. Davis, 66 years old, has developed sudden facial droop, slurred speech, and left arm weakness over the past 30 minutes. Her last known well time was 30 minutes ago.",
+      vitals:[{l:"HR",v:"86 bpm",s:"normal"},{l:"BP",v:"176/98 mmHg",s:"abnormal"},{l:"SpO2",v:"95%",s:"normal"},{l:"BSL",v:"7.2 mmol/L",s:"normal"}],
+      opts:[
+        {lt:"A",tx:"Give the patient time to rest as symptoms may resolve spontaneously.",lv:"Safe"},
+        {lt:"B",tx:"Activate stroke pathway immediately, perform and document NIHSS, obtain IV access, urgent CT brain and CT angiogram, notify stroke team - this patient is within the thrombolysis window.",lv:"Moderate"},
+        {lt:"C",tx:"Administer IV alteplase independently without physician review.",lv:"Advanced"}
+      ],
+      ci:1,
+      fb:"Well done. Acute stroke with symptom onset 30 minutes ago is within the 4.5-hour thrombolysis window. Stroke pathway activation, NIHSS documentation, IV access, urgent CT, and stroke team notification are all time-critical.",
+      pearl:"Time is brain - every 15-minute reduction in door-to-needle time for thrombolysis saves approximately 1 million neurons. Minimise delays at every step."
+    },
+    Complex:{
+      text:"Mrs. Davis, 66 years old, has developed a sudden severe headache, vomiting, photophobia, and is becoming increasingly drowsy. She rates the headache 10/10, describing it as the worst of her life.",
+      vitals:[{l:"HR",v:"54 bpm",s:"borderline"},{l:"BP",v:"202/118 mmHg",s:"abnormal"},{l:"SpO2",v:"92%",s:"borderline"},{l:"GCS",v:"11/15",s:"borderline"}],
+      opts:[
+        {lt:"A",tx:"Administer analgesia for headache and place in a dark quiet room.",lv:"Safe"},
+        {lt:"B",tx:"Notify the physician urgently, apply oxygen, establish IV access, obtain urgent CT brain.",lv:"Moderate"},
+        {lt:"C",tx:"Activate rapid response immediately, apply high-flow oxygen, establish IV access, obtain urgent CT brain without contrast before lumbar puncture, keep strictly nil by mouth, notify neurosurgery and ICU, prepare for potential emergency craniotomy - presentation is consistent with subarachnoid haemorrhage.",lv:"Advanced"}
+      ],
+      ci:2,
+      fb:"Excellent. Worst headache of life with vomiting, photophobia, and Cushing triad signs and declining GCS is subarachnoid haemorrhage until proven otherwise. Immediate escalation, CT brain, neurosurgery notification, and ICU preparation are all critical.",
+      pearl:"Cushing triad - hypertension, bradycardia, and irregular respirations - indicates raised intracranial pressure and is a pre-terminal sign requiring immediate neurosurgical intervention."
+    }
+  }}
+];
+
+// ─── State ──────────────────────────────────────────────────────────────────
+var S={
+  studentId:null,sessionId:null,decisionNumber:0,queue:[],
+  currentScenario:null,currentVersion:null,
+  complexity:"Moderate",timePressure:"Moderate",information:"Full",
+  scenarioStartTime:null,selectedOption:null,confidenceRating:null,
+  bsiHistory:[],consecutiveLow:0,consecutiveHigh:0,rollingResponses:[],
+  correctCount:0,bsiLog:[],timerInterval:null,timerRemaining:0,timerMax:60,
+  transitionMsg:null,lastLatencyMs:0,pauseCount:0,isPaused:false,
+  totalEscalations:0,totalDeescalations:0,totalTimeouts:0,
+  domainBsi:{respiratory:[],medication:[],deterioration:[],infection:[],fluid:[],neurological:[]},
+  weakestDomain:null
+};
+
+// ─── Utilities ──────────────────────────────────────────────────────────────
+function uuid(){
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){
+    var r=Math.random()*16|0,v=c==="x"?r:(r&0x3|0x8);return v.toString(16);
+  });
+}
+function hashId(){
+  var stored;
+  try{stored=sessionStorage.getItem("acse_sid");}catch(e){}
+  if(stored)return stored;
+  var id="S"+Math.random().toString(36).substr(2,9).toUpperCase();
+  try{sessionStorage.setItem("acse_sid",id);}catch(e){}
+  return id;
+}
+function showScreen(id){
+  var screens=document.querySelectorAll(".screen");
+  for(var i=0;i<screens.length;i++)screens[i].classList.remove("active");
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0,0);
+}
+
+function buildQueue(){
+  var byDomain={};
+  for(var i=0;i<SC.length;i++){
+    var s=SC[i];
+    if(!byDomain[s.domain])byDomain[s.domain]=[];
+    byDomain[s.domain].push(s);
+  }
+  var domains=Object.keys(byDomain);
+  // shuffle each domain pool
+  for(var d=0;d<domains.length;d++){
+    var pool=byDomain[domains[d]];
+    for(var j=pool.length-1;j>0;j--){
+      var k=Math.floor(Math.random()*(j+1));
+      var t=pool[j];pool[j]=pool[k];pool[k]=t;
+    }
+  }
+  // shuffle domain order
+  var domOrder=domains.slice();
+  for(var j2=domOrder.length-1;j2>0;j2--){
+    var k2=Math.floor(Math.random()*(j2+1));
+    var t2=domOrder[j2];domOrder[j2]=domOrder[k2];domOrder[k2]=t2;
+  }
+  var queue=[],dIdx={};
+  for(var d2=0;d2<domains.length;d2++)dIdx[domains[d2]]=0;
+  // cap target at actual available scenarios
+  var target=Math.min(CFG.SL,SC.length);
+  var qi=0,exhausted=0;
+  while(queue.length<target && exhausted<domains.length){
+    exhausted=0;
+    for(var d3=0;d3<domOrder.length&&queue.length<target;d3++){
+      var dom=domOrder[d3];
+      var pl=byDomain[dom],pi=dIdx[dom];
+      if(pi<pl.length){queue.push(pl[pi]);dIdx[dom]++;}
+      else{exhausted++;}
+    }
+    qi++;if(qi>50)break;
+  }
+  // filter out any undefined entries (safety net)
+  queue=queue.filter(function(x){return x&&x.versions;});
+  return queue.slice(0,target);
+}
+
+// ─── Timer ──────────────────────────────────────────────────────────────────
+var CIRC=138.23;
+function tMax(){
+  if(S.timePressure==="Relaxed")return 60;
+  if(S.timePressure==="Urgent")return 20;
+  return 40;
+}
+function startTimer(){
+  clearTimer();
+  S.timerMax=tMax();S.timerRemaining=S.timerMax;
+  updateTimer();
+  S.timerInterval=setInterval(function(){
+    if(S.isPaused)return;
+    S.timerRemaining--;
+    updateTimer();
+    if(S.timerRemaining<=0){clearTimer();handleTimeout();}
+  },1000);
+}
+function clearTimer(){
+  if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;}
+}
+function updateTimer(){
+  var rem=S.timerRemaining,mx=S.timerMax,pct=rem/mx,offset=CIRC*(1-pct);
+  var ring=document.getElementById("timerRing"),
+      display=document.getElementById("timerDisplay"),
+      hint=document.getElementById("timerHint");
+  if(!ring)return;
+  ring.style.strokeDashoffset=offset;
+  display.textContent=rem;
+  if(pct>0.5){ring.style.stroke="var(--timer-green)";hint.textContent="Take your time";}
+  else if(pct>0.25){ring.style.stroke="var(--timer-amber)";hint.textContent="Decide soon";}
+  else{ring.style.stroke="var(--timer-red)";hint.textContent="Time running out";}
+}
+function handleTimeout(){
+  S.totalTimeouts++;
+  if(S.selectedOption!==null)return;
+  S.selectedOption=0;
+  var lat=S.timerMax*1000;S.lastLatencyMs=lat;
+  var btns=document.querySelectorAll(".answer-btn");
+  if(btns[0])btns[0].classList.add("selected");
+  setTimeout(function(){processResp(lat);},200);
+}
+
+// ─── Domain labels ───────────────────────────────────────────────────────────
+var DLABELS={
+  respiratory:"Respiratory",medication:"Medication",deterioration:"Deterioration",
+  infection:"Infection Control",fluid:"Fluid Balance",neurological:"Neurological"
+};
+
+// ─── Load Scenario ───────────────────────────────────────────────────────────
+function loadScenario(){
+  S.selectedOption=null;S.confidenceRating=null;S.transitionMsg=null;
+  S.currentScenario=S.queue[S.decisionNumber];
+  S.currentVersion=S.currentScenario.versions[S.complexity];
+  var n=S.decisionNumber+1,L=CFG.SL;
+  document.getElementById("sessionBadge").textContent="Q"+n+" of "+L;
+  document.getElementById("progressLabel").textContent="Question "+n;
+  var pct=Math.round(((n-1)/L)*100);
+  document.getElementById("progressPercent").textContent=pct+"%";
+  document.getElementById("progressFill").style.width=pct+"%";
+  var dom=S.currentScenario.domain,badge=document.getElementById("domainBadge");
+  badge.textContent=DLABELS[dom]||dom;badge.className="domain-badge "+dom;
+  var ver=S.currentVersion;
+  document.getElementById("scenarioText").textContent=ver.text;
+  renderVitals(ver.vitals);renderOptions(ver.opts);
+  var card=document.getElementById("scenarioCard");
+  card.classList.remove("fade-in");void card.offsetWidth;card.classList.add("fade-in");
+  var pb=document.getElementById("pauseBtn");pb.disabled=(S.pauseCount>=CFG.MP);
+  showScreen("screen-scenario");
+  S.scenarioStartTime=Date.now();startTimer();
+}
+
+function renderVitals(vitals){
+  var grid=document.getElementById("vitalsGrid");grid.innerHTML="";
+  var vShow=vitals.slice();
+  if(S.information==="Partial"){
+    vShow=vitals.map(function(v,i){return i===2?{l:v.l,v:null,s:"missing"}:v;});
+  } else if(S.information==="Ambiguous"){
+    vShow=vitals.map(function(v,i){return(i===2||i===3)?{l:v.l,v:null,s:"missing"}:v;});
+  }
+  vShow.forEach(function(vital){
+    var item=document.createElement("div");item.className="vital-item";
+    var lbl=document.createElement("div");lbl.className="vital-label";lbl.textContent=vital.l;item.appendChild(lbl);
+    var val=document.createElement("div");
+    if(vital.v===null||vital.s==="missing"){
+      val.className="vital-missing";val.textContent="Not recorded";
+    } else {
+      val.className="vital-value"+(vital.s!=="normal"?" "+vital.s:"");
+      val.textContent=vital.v;
+    }
+    item.appendChild(val);grid.appendChild(item);
+  });
+}
+
+function renderOptions(opts){
+  var c=document.getElementById("answerOptions");c.innerHTML="";
+  opts.forEach(function(opt,idx){
+    var btn=document.createElement("button");btn.className="answer-btn";
+    btn.innerHTML="<div class=\"answer-letter\">"+opt.lt+"</div><div class=\"answer-text\">"+opt.tx+"</div>";
+    function sel(){
+      if(S.selectedOption!==null)return;
+      S.selectedOption=idx;
+      var lat=Date.now()-S.scenarioStartTime;
+      btn.classList.add("selected");clearTimer();
+      setTimeout(function(){processResp(lat);},180);
+    }
+    btn.addEventListener("touchstart",function(e){e.preventDefault();sel();},{passive:false});
+    btn.addEventListener("click",sel);
+    c.appendChild(btn);
+  });
+}
+
+// ─── Response ─────────────────────────────────────────────────────────────────
+function processResp(lat){
+  S.lastLatencyMs=lat;
+  var qn=S.decisionNumber+1;
+  document.getElementById("confBadge").textContent="Q"+qn+" of "+CFG.SL;
+  document.querySelectorAll(".conf-btn").forEach(function(b){b.classList.remove("selected");});
+  showScreen("screen-confidence");
+}
+
+document.querySelectorAll(".conf-btn").forEach(function(btn){
+  function hc(e){
+    e.preventDefault();
+    var val=parseInt(btn.getAttribute("data-val"));
+    S.confidenceRating=val;
+    document.querySelectorAll(".conf-btn").forEach(function(b){b.classList.remove("selected");});
+    btn.classList.add("selected");
+    setTimeout(finalise,200);
+  }
+  btn.addEventListener("touchstart",hc,{passive:false});
+  btn.addEventListener("click",hc);
+});
+
+// ─── Finalise Decision ────────────────────────────────────────────────────────
+function finalise(){
+  var lat=S.lastLatencyMs,conf=S.confidenceRating||3;
+  var ver=S.currentVersion,idx=S.selectedOption;
+  var isCorrect=(idx===ver.ci);
+  var resLv=ver.opts[idx]?ver.opts[idx].lv:"Safe";
+  var dom=S.currentScenario.domain;
+  var latSec=lat/1000;
+  var normLat=Math.min(1,Math.max(0,(latSec-3)/(45-3)));
+  var cLv=["Simple","Moderate","Complex"],rLv=["Safe","Moderate","Advanced"];
+  var cIdx=cLv.indexOf(S.complexity),rIdx=rLv.indexOf(resLv);
+  var isAvoid=(rIdx<cIdx);
+  S.rollingResponses.push(isAvoid?1:0);
+  if(S.rollingResponses.length>CFG.RW)S.rollingResponses.shift();
+  var avRate=S.rollingResponses.reduce(function(a,b){return a+b;},0)/S.rollingResponses.length;
+  var confInv=1-(conf/5);
+  var bsi=Math.min(1,Math.max(0,(CFG.WL*normLat)+(CFG.WA*avRate)+(CFG.WC*confInv)));
+  S.bsiLog.push(bsi);
+  if(!S.domainBsi[dom])S.domainBsi[dom]=[];
+  S.domainBsi[dom].push(bsi);
+  if(isCorrect)S.correctCount++;
+  var aEvent="MAINTENANCE",pChanged=null;S.transitionMsg=null;
+  if(bsi>CFG.BH){
+    S.consecutiveHigh++;S.consecutiveLow=0;
+    if(S.consecutiveHigh>=CFG.CC){
+      var de=deescalate();
+      if(de){aEvent="DE-ESCALATION";pChanged=de;S.transitionMsg="Let us try a different approach";S.consecutiveHigh=0;S.totalDeescalations++;}
+    }
+  } else if(bsi<CFG.BL){
+    S.consecutiveLow++;S.consecutiveHigh=0;
+    if(S.consecutiveLow>=CFG.CC){
+      var es=escalate();
+      if(es){aEvent="ESCALATION";pChanged=es;S.transitionMsg="Ready for a greater challenge?";S.consecutiveLow=0;S.totalEscalations++;}
+    }
+  } else {
+    S.consecutiveHigh=0;S.consecutiveLow=0;
+  }
+  var logEntry={
+    studentId:S.studentId,sessionId:S.sessionId,decisionNumber:S.decisionNumber+1,
+    scenarioId:S.currentScenario.id,domain:dom,complexity:S.complexity,
+    timePressure:S.timePressure,information:S.information,
+    responseSelected:ver.opts[idx]?ver.opts[idx].lt:"A",responseLevel:resLv,
+    latencyMs:Math.round(lat),normalisedLatency:Math.round(normLat*100)/100,
+    avoidanceRate:Math.round(avRate*100)/100,confidenceRating:conf,
+    bsi:Math.round(bsi*100)/100,adaptationEvent:aEvent,parameterChanged:pChanged,
+    timedOut:(lat>=S.timerMax*1000-100),appVersion:"2.0.0",timestamp:new Date().toISOString()
+  };
+  try{
+    var logs=[];
+    var stored=sessionStorage.getItem("acse_logs");
+    if(stored)logs=JSON.parse(stored);
+    logs.push(logEntry);
+    sessionStorage.setItem("acse_logs",JSON.stringify(logs));
+  }catch(e){}
+  showFeedback(isCorrect,ver);
+}
+
+function deescalate(){
+  var pl=["Relaxed","Moderate","Urgent"],il=["Ambiguous","Partial","Full"],cl=["Simple","Moderate","Complex"];
+  var ti=pl.indexOf(S.timePressure);if(ti>0){S.timePressure=pl[ti-1];return"timePressure";}
+  var ii=il.indexOf(S.information);if(ii<2){S.information=il[ii+1];return"information";}
+  var ci=cl.indexOf(S.complexity);if(ci>0){S.complexity=cl[ci-1];return"complexity";}
+  return null;
+}
+function escalate(){
+  var cl=["Simple","Moderate","Complex"],il=["Ambiguous","Partial","Full"],pl=["Relaxed","Moderate","Urgent"];
+  var ci=cl.indexOf(S.complexity);if(ci<2){S.complexity=cl[ci+1];return"complexity";}
+  var ii=il.indexOf(S.information);if(ii>0){S.information=il[ii-1];return"information";}
+  var ti=pl.indexOf(S.timePressure);if(ti<2){S.timePressure=pl[ti+1];return"timePressure";}
+  return null;
+}
+
+// ─── Feedback ─────────────────────────────────────────────────────────────────
+function showFeedback(isCorrect,ver){
+  var qn=S.decisionNumber+1;
+  document.getElementById("feedbackBadge").textContent="Q"+qn+" of "+CFG.SL;
+  var rEl=document.getElementById("feedbackResult");
+  if(isCorrect){
+    rEl.innerHTML="<div class=\"result-icon correct\">&#10003;</div><div class=\"result-title correct\">Optimal Response</div>";
+  } else {
+    rEl.innerHTML="<div class=\"result-icon incorrect\">&#10007;</div><div class=\"result-title incorrect\">Not the Best Choice</div>";
+  }
+  document.getElementById("feedbackText").textContent=ver.fb;
+  document.getElementById("pearlText").textContent=ver.pearl||"";
+  var tEl=document.getElementById("transitionMsg");
+  if(S.transitionMsg){tEl.textContent=S.transitionMsg;tEl.classList.add("visible");}
+  else{tEl.classList.remove("visible");tEl.textContent="";}
+  document.getElementById("nextBtn").textContent=(S.decisionNumber<CFG.SL-1)?"Continue":"View Results";
+  showScreen("screen-feedback");
+}
+
+document.getElementById("nextBtn").addEventListener("click",function(){
+  S.decisionNumber++;
+  if(S.decisionNumber>=CFG.SL){showSummary();}else{loadScenario();}
+});
+
+// ─── Summary ──────────────────────────────────────────────────────────────────
+function sessionTrajectory(){
+  var log=S.bsiLog;
+  if(log.length<6)return"stable";
+  var half=Math.floor(log.length/2);
+  var first=log.slice(0,half),last=log.slice(half);
+  var fm=first.reduce(function(a,b){return a+b;},0)/first.length;
+  var lm=last.reduce(function(a,b){return a+b;},0)/last.length;
+  if(fm-lm>0.05)return"improving";
+  if(lm-fm>0.05)return"declining";
+  return"stable";
+}
+function domainRating(scores){
+  if(!scores||scores.length===0)return{r:"developing",b:0.5};
+  var mean=scores.reduce(function(a,b){return a+b;},0)/scores.length;
+  var rci=1-mean;
+  if(rci>=0.65)return{r:"strong",b:rci};
+  if(rci>=0.40)return{r:"developing",b:rci};
+  return{r:"focus",b:rci};
+}
+function weakestDomain(){
+  var doms=Object.keys(S.domainBsi),worst=null,wm=-1;
+  for(var i=0;i<doms.length;i++){
+    var sc=S.domainBsi[doms[i]];
+    if(!sc||!sc.length)continue;
+    var m=sc.reduce(function(a,b){return a+b;},0)/sc.length;
+    if(m>wm){wm=m;worst=doms[i];}
+  }
+  return worst;
+}
+
+function showSummary(){
+  clearTimer();
+  S.weakestDomain=weakestDomain();
+  var score=S.correctCount;
+  var queueLen=S.queue.length;
+  document.getElementById("scoreBig").textContent=score;
+  document.getElementById("scoreDenom").textContent="/"+queueLen;
+  var perf,perfClass,icon,perfMsg;
+  if(score>=11){perf="Excellent";perfClass="excellent";icon="&#x1F31F;";perfMsg="Outstanding performance across all clinical domains.";}
+  else if(score>=8){perf="Good";perfClass="good";icon="&#x1F393;";perfMsg="Solid clinical reasoning with room to stretch further.";}
+  else{perf="Keep Practising";perfClass="keep-practising";icon="&#x1F4D8;";perfMsg="Revisit these clinical domains to build your confidence.";}
+  document.getElementById("summaryIcon").innerHTML=icon;
+  document.getElementById("summaryPerf").textContent=perfMsg;
+  var badge=document.getElementById("perfBadge");badge.textContent=perf;badge.className="perf-badge "+perfClass;
+  var traj=sessionTrajectory(),tBadge=document.getElementById("trajectoryBadge"),tDesc=document.getElementById("trajectoryDesc");
+  if(traj==="improving"){
+    tBadge.textContent="Improving";tBadge.className="trajectory-badge improving";
+    tDesc.textContent="Your clinical response confidence improved across the session.";
+  } else if(traj==="declining"){
+    tBadge.textContent="Needs Focus";tBadge.className="trajectory-badge declining";
+    tDesc.textContent="Your response confidence decreased - review the domains below.";
+  } else {
+    tBadge.textContent="Stable";tBadge.className="trajectory-badge stable";
+    tDesc.textContent="Your clinical confidence remained consistent throughout the session.";
+  }
+  var dg=document.getElementById("domainGrid");dg.innerHTML="";
+  var allDoms=["respiratory","medication","deterioration","infection","fluid","neurological"];
+  var dNames={respiratory:"Respiratory",medication:"Medication",deterioration:"Deterioration",infection:"Infection",fluid:"Fluid Balance",neurological:"Neurological"};
+  var rLabels={strong:"Strong",developing:"Developing",focus:"Focus Area"};
+  allDoms.forEach(function(dom){
+    var scores=S.domainBsi[dom];
+    if(!scores||!scores.length)return;
+    var res=domainRating(scores),isW=(dom===S.weakestDomain);
+    var item=document.createElement("div");
+    item.className="domain-item"+(isW?" weakest":"");
+    item.innerHTML="<div class=\"domain-item-name\">"+(dNames[dom]||dom)+"</div>"+
+      "<div class=\"domain-bar-track\"><div class=\"domain-bar-fill "+res.r+"\" style=\"width:"+Math.round(res.b*100)+"%\"></div></div>"+
+      "<div class=\"domain-rating "+res.r+"\">"+(rLabels[res.r])+"</div>";
+    dg.appendChild(item);
+  });
+  renderChart();
+  showScreen("screen-summary");
+}
+
+function renderChart(){
+  var ctx=document.getElementById("bsiChart").getContext("2d");
+  var labels=[];
+  for(var i=1;i<=S.bsiLog.length;i++)labels.push("Q"+i);
+  var rci=S.bsiLog.map(function(b){return Math.round((1-b)*100)/100;});
+  try{
+    var ec=Chart.getChart&&Chart.getChart(document.getElementById("bsiChart"));
+    if(ec)ec.destroy();
+  }catch(e){}
+  try{
+    new Chart(ctx,{
+      type:"line",
+      data:{
+        labels:labels,
+        datasets:[{
+          label:"Response Confidence Index",data:rci,
+          borderColor:"#1a5f8a",backgroundColor:"rgba(26,95,138,0.10)",
+          borderWidth:2.5,pointBackgroundColor:"#1a5f8a",pointRadius:4,
+          tension:0.35,fill:true
+        }]
+      },
+      options:{
+        responsive:true,animation:{duration:600},
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{title:{display:true,text:"Question",color:"#7a94a8",font:{size:12}},grid:{color:"#e8eef4"},ticks:{color:"#7a94a8",font:{size:12}}},
+          y:{min:0,max:1,title:{display:true,text:"Response Confidence Index",color:"#7a94a8",font:{size:12}},grid:{color:"#e8eef4"},ticks:{color:"#7a94a8",font:{size:12}}}
+        }
+      }
+    });
+  }catch(e){
+    document.getElementById("bsiChart").parentElement.innerHTML="<div style=\"text-align:center;color:var(--text-light);padding:20px;\">"+S.correctCount+" of 13 optimal responses</div>";
+  }
+}
+
+// ─── Pause ────────────────────────────────────────────────────────────────────
+document.getElementById("pauseBtn").addEventListener("click",function(){
+  if(S.pauseCount>=CFG.MP)return;
+  S.isPaused=true;S.pauseCount++;
+  document.getElementById("pauseCount").textContent="Pauses remaining: "+(CFG.MP-S.pauseCount);
+  document.getElementById("pauseOverlay").classList.add("visible");
+});
+document.getElementById("resumeBtn").addEventListener("click",function(){
+  S.isPaused=false;
+  document.getElementById("pauseOverlay").classList.remove("visible");
+  document.getElementById("pauseBtn").disabled=(S.pauseCount>=CFG.MP);
+});
+
+// ─── Summary actions ──────────────────────────────────────────────────────────
+document.getElementById("submitSummaryBtn").addEventListener("click",function(){
+  clearTimer();
+  showScreen("screen-start");
+});
+document.getElementById("retryBtn").addEventListener("click",function(){initSession();});
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+function hs(){initSession();}
+document.getElementById("startBtn").addEventListener("click",hs);
+document.getElementById("startBtn").addEventListener("touchstart",function(e){e.preventDefault();hs();},{passive:false});
+
+function initSession(){
+  S.studentId=hashId();S.sessionId=uuid();S.decisionNumber=0;S.queue=buildQueue();
+  S.complexity="Moderate";S.timePressure="Moderate";S.information="Full";
+  S.selectedOption=null;S.confidenceRating=null;S.bsiHistory=[];
+  S.consecutiveLow=0;S.consecutiveHigh=0;S.rollingResponses=[];
+  S.correctCount=0;S.bsiLog=[];S.timerInterval=null;S.timerRemaining=0;
+  S.transitionMsg=null;S.lastLatencyMs=0;S.pauseCount=0;S.isPaused=false;
+  S.totalEscalations=0;S.totalDeescalations=0;S.totalTimeouts=0;
+  S.domainBsi={respiratory:[],medication:[],deterioration:[],infection:[],fluid:[],neurological:[]};
+  S.weakestDomain=null;
+  try{sessionStorage.removeItem("acse_logs");}catch(e){}
+  document.getElementById("pauseOverlay").classList.remove("visible");
+  loadScenario();
+}
+
+</script>
+</body>
+</html>
